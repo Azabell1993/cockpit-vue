@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cockpit Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #666;
+        }
+        button {
+            margin-right: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #response, #cResponse {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to Cockpit Test Page</h1>
+    <p>This is a test page to check if Cockpit API endpoint is working.</p>
+    <button id="fetchButton">Fetch Cockpit Data</button>
+    <button id="fetchCButton">Fetch C Data</button>
+    <div id="response"><pre id="responsePre"></pre></div>
+    <div id="cResponse"><pre id="cResponsePre"></pre></div>
+
+    <script>
+        async function fetchData(url, elementId) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log(data);
+                document.getElementById(elementId).innerText = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error(`Error fetching data from ${url}:`, error);
+                document.getElementById(elementId).innerText = `Error fetching data. Check console for details.`;
+            }
+        }
+
+        document.getElementById('fetchButton').addEventListener('click', () => {
+            fetchData('http://localhost:8081/api/data', 'responsePre');
+        });
+
+        document.getElementById('fetchCButton').addEventListener('click', () => {
+            fetchData('http://localhost:8081/api/update', 'cResponsePre');
+        });
+
+        // Periodically fetch C data
+        setInterval(() => {
+            fetchData('http://localhost:8081/api/update', 'cResponsePre');
+        }, 10000); // Fetch data every 10 seconds
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Ignore all files in the /secrets directory
+/secrets/*
+
+# Allow tracking of the /secrets directory itself
+!/secrets/
+
+# Ignore specific file types in the /secrets directory
+/secrets/*.key
+/secrets/*.pem
+
+# If there are any specific files that you want to include, you can use ! to negate the pattern
+# Example: !/secrets/README.md

@@ -13,15 +13,17 @@ if [ "$ENVIRONMENT" == "production" ]; then
     KEY_FILE="/container/secrets/server.key"
     PEER_CERT_FILE="/container/secrets/server.crt"
     PORT=443
+    UNIX_SOCKET_PATH="/tmp/cockpit.sock"
 
     # Python 서버 실행 (백그라운드)
     python3 /container/src/py/server.py --address 0.0.0.0 --port $PYTHON_SERVER_PORT &
-    /container/cockpit-cloud-connector --cert "$CERT_FILE" --key "$KEY_FILE" --peer-cert "$PEER_CERT_FILE" server /tmp/server.sock --port $PORT
+    /container/cockpit-cloud-connector --cert "$CERT_FILE" --key "$KEY_FILE" --peer-cert "$PEER_CERT_FILE" server "$UNIX_SOCKET_PATH"
 else
     # 로컬 환경 변수
     PORT=8080
+    UNIX_SOCKET_PATH="/tmp/cockpit.sock"
 
     # Python 서버 실행 (백그라운드)
     python3 /container/src/py/server.py --address 0.0.0.0 --port $PYTHON_SERVER_PORT &
-    /container/cockpit-cloud-connector server /tmp/server.sock --port $PORT --use-tls=false
+    /container/cockpit-cloud-connector server "$UNIX_SOCKET_PATH" --address=0.0.0.0 --port $PORT --use-tls=false
 fi

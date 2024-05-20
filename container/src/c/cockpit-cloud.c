@@ -1,22 +1,20 @@
-/* ************************************************************************************************************************************************************ */
-/** DEFINE START */
-#define G_LOG_DOMAIN "cockpit-cloud-connector"
-/** DEFINE END */
-
-/** INCLUDE START */
 #include <glib.h>
 #include <locale.h>
 #include <stdlib.h>
 #include <gio/gunixsocketaddress.h>
-#include <json-glib/json-glib.h>    // json-glib 라이브러리 포함
-#include <libsoup/soup.h>           // libsoup 라이브러리 포함
+#include <json-glib/json-glib.h>
+#include <libsoup/soup.h>
 
 #define G_LOG_DOMAIN "cockpit-cloud-connector"
 
-/** INCLUDE END */
+typedef struct {
+    gboolean should_exit;
+    GOutputStream *tcp_primary;
+    GQueue *unix_waiting;
+    GTlsCertificate *certificate;
+    GTlsCertificate *expected_peer_certificate;
+} Server;
 
-/* ************************************************************************************************************************************************************ */
-/** {{{{ 1 Helpers START */
 gboolean throw(GError **error, const gchar *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -28,40 +26,51 @@ gboolean throw(GError **error, const gchar *fmt, ...) {
 
     return FALSE;
 }
-/** {{{{ 1 Helpers END */
-/* ************************************************************************************************************************************************************ */
 
-/* ************************************************************************************************************************************************************ */
-/** {{{{ 1 Server START */
-typedef struct {
-    gboolean should_exit;
-    GOutputStream *tcp_primary;
-    GQueue *unix_waiting;
-    GTlsCertificate *certificate;
-    GTlsCertificate *expected_peer_certificate;
-} Server;
+static gchar* get_current_timestamp() {
+    GDateTime *now = g_date_time_new_now_local();
+    gchar *timestamp = g_date_time_format(now, "%Y-%m-%d %H:%M:%S");
+    g_date_time_unref(now);
+    return timestamp;
+}
 
-static void send_data_to_python_server(const gchar *data) {
+static void send_data_to_python_server(const gchar *status, const gchar *data) {
     const gchar *python_server_host = g_getenv("PYTHON_SERVER_HOST");
     const gchar *python_server_port = g_getenv("PYTHON_SERVER_PORT");
+
     if (!python_server_host || !python_server_port) {
-        g_warning("Python server host or port not set");
+        g_warning("Python server host or port not set. Host: %s, Port: %s", 
+                   python_server_host ? python_server_host : "NULL", 
+                   python_server_port ? python_server_port : "NULL");
         return;
     }
 
     g_autofree gchar *url = g_strdup_printf("http://%s:%s/api/update", python_server_host, python_server_port);
     g_debug("Sending data to Python server: %s", data);
 
+    gchar *timestamp = get_current_timestamp();
+    g_autofree gchar *json_data = g_strdup_printf("{\"status\": \"%s\", \"data\": \"%s\", \"timestamp\": \"%s\"}", status, data, timestamp);
+    g_free(timestamp);
+
     SoupSession *session = soup_session_new();
     SoupMessage *msg = soup_message_new("POST", url);
 
-    soup_message_set_request(msg, "application/json", SOUP_MEMORY_COPY, data, strlen(data));
+    soup_message_set_request(msg, "application/json", SOUP_MEMORY_COPY, json_data, strlen(json_data));
     guint status_code = soup_session_send_message(session, msg);
 
     if (status_code != SOUP_STATUS_OK) {
-        g_warning("Failed to send data to Python server: %s", soup_status_get_phrase(status_code));
+        g_warning("Failed to send data to Python server: %s (%s). Data: %s", 
+                  soup_status_get_phrase(status_code), url, json_data);
     } else {
-        g_debug("Data sent successfully to Python server");
+        g_debug("Data sent successfully to Python server. Status code: %u, URL: %s, Data: %s", 
+                status_code, url, json_data);
+        
+        // Check the response body if needed
+        SoupBuffer *response_body = soup_message_body_flatten(msg->response_body);
+        gchar *response_data = g_strndup(response_body->data, response_body->length);
+        g_debug("Response from Python server: %s", response_data);
+        g_free(response_data);
+        soup_buffer_free(response_body);
     }
 
     g_object_unref(msg);
@@ -77,8 +86,7 @@ static void server_request_connection(Server *self) {
         self->should_exit = TRUE;
     }
 
-    const gchar *example_data = "{\"status\": \"TCP connection requested\", \"data\": \"example data from C\"}";
-    send_data_to_python_server(example_data);
+    send_data_to_python_server("TCP connection requested", "example data from C");
 }
 
 static gboolean server_on_unix_incoming(GSocketService *service, GSocketConnection *connection, GObject *source_object, gpointer user_data) {
@@ -222,7 +230,7 @@ static gboolean server(gchar **args, GTlsCertificate *certificate, GTlsCertifica
     };
 
     // 초기 데이터 전송
-    send_data_to_python_server("{\"status\": \"Server started\"}");
+    send_data_to_python_server("Server started", "initial data from C");
 
     g_signal_connect(unix_service, "incoming", G_CALLBACK(server_on_unix_incoming), &self);
     if (use_tls) {
@@ -238,12 +246,7 @@ static gboolean server(gchar **args, GTlsCertificate *certificate, GTlsCertifica
 
     return TRUE;
 }
-/** {{{{ 1 Server END */
-/* ************************************************************************************************************************************************************ */
 
-/* ************************************************************************************************************************************************************ */
-/** {{{{ 1 Client START */
-/* {{{1 Client */
 typedef struct {
     GSocketClient *socket_client;
     GSocketConnectable *connectable;
@@ -367,11 +370,7 @@ gboolean client(gchar **args, GTlsCertificate *certificate, GTlsCertificate *pee
 
     return TRUE;
 }
-/** {{{{ 1 Client END */
-/* ************************************************************************************************************************************************************ */
 
-/* ************************************************************************************************************************************************************ */
-/** {{{{ MAIN */
 gboolean gmain(int argc, char **argv, GError **error) {
     g_autofree gchar *key_file = NULL;
     g_autofree gchar *cert_file = NULL;
@@ -433,9 +432,8 @@ gboolean gmain(int argc, char **argv, GError **error) {
     return throw(error, "Unrecognised subcommand %s", subcommand);
 }
 
-gboolean send_periodic_data(gpointer user_data) {
-    const gchar *example_data = "{\"status\": \"Periodic update\", \"data\": \"example periodic data from C\"}";
-    send_data_to_python_server(example_data);
+static gboolean send_periodic_data(gpointer user_data) {
+    send_data_to_python_server("Periodic update", "example periodic data from C");
     return TRUE;
 }
 
@@ -476,14 +474,10 @@ int main(int argc, char **argv) {
 
     g_timeout_add_seconds(10, send_periodic_data, NULL);
 
-    // 초기 데이터 전송
-    send_data_to_python_server("{\"status\": \"Server started\"}");
+    send_data_to_python_server("Server started", "initial data from C");
 
     const gchar *log_file_path = "/var/log/cockpit/cockpit-cloud-connector.log";
     g_log_set_handler(G_LOG_DOMAIN, G_LOG_LEVEL_MASK, log_to_file, (gpointer)log_file_path);
 
     return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
-/* ************************************************************************************************************************************************************ */
-/** {{{{ MAIN END */

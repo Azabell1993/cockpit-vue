@@ -61,7 +61,7 @@
                 }
                 const data = await response.json();
                 console.log(data);
-                document.getElementById(elementId).innerText = JSON.stringify(data, null, 2);
+                document.getElementById(elementId).innerText = `Status: ${data.status}\nData: ${data.data}\nTimestamp: ${data.timestamp}`;
             } catch (error) {
                 console.error(`Error fetching data from ${url}:`, error);
                 document.getElementById(elementId).innerText = `Error fetching data. Check console for details.`;

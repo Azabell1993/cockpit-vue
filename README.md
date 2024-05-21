@@ -10,30 +10,33 @@
   
 ## 파일 구조  
 ```
-cockpit-vue
+.
 ├── container
-│ ├── Dockerfile
-│ ├── run.sh
-│ └── src
-│ ├── c
-│ │ ├── cockpit-cloud.c
-│ │ └── Makefile
-│ └── py
-│ └── server.py
+│   ├── Dockerfile
+│   ├── run.sh
+│   ├── secrets
+│   │   ├── client.crt
+│   │   ├── client.key
+│   │   ├── myKey.pem
+│   │   ├── server.crt
+│   │   └── server.key
+│   ├── src
+│   │   ├── c
+│   │   │   ├── cockpit-cloud.c
+│   │   │   └── Makefile
+│   │   └── py
+│   │       ├── Dockerfile
+│   │       └── server.py
+│   └── start.sh
 ├── docker-compose.yml
+├── docker_run.ps1
 ├── docker_run.sh
 ├── frontend
-│ ├── Dockerfile
-│ ├── nginx.conf
-│ └── src
-│ └── index.html
-├── README.md
-└── secrets
-├── client.crt
-├── client.key
-├── myKey.pem
-├── server.crt
-└── server.key
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── src
+│       └── index.html
+└── README.md
 ```  
   
 ## 사용 방법  

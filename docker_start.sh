@@ -88,16 +88,6 @@ else
     exit 1
 fi
 
-echo -e "${GREEN}Docker Cleaning...${NC}"
-sudo docker-compose down
-sudo docker system prune -a
-sudo systemctl restart docker
-if [ $? -ne 0 ]; then
-    echo -e "${RED}docker 서비스 재시작 실패!${NC}"
-    exit 1
-fi
-echo -e "${GREEN}docker 서비스 재시작 완료!${NC}"
-
 # Cockpit 서비스 재시작
 echo -e "${GREEN}Cockpit 서비스를 재시작 중입니다...${NC}"
 sudo systemctl restart cockpit
@@ -113,6 +103,7 @@ if [ -d "container/secrets" ]; then
     rm -rf container/secrets
     if [ $? -ne 0 ]; then
         echo -e "${RED}secrets 디렉토리 삭제 실패!${NC}"
+        echo -e "${RED}반드시 sudo 권한으로 해주세요.${NC}"
         exit 1
     fi
     echo -e "${GREEN}기존의 secrets 디렉토리 삭제 완료!${NC}"
@@ -151,23 +142,6 @@ fi
 
 echo -e "${GREEN}SSL 키와 인증서, myKey.pem 생성 완료!${NC}"
 
-# Docker 이미지를 빌드
-echo -e "${GREEN}Docker 이미지를 빌드 중입니다...${NC}"
-sudo docker build -t cockpit-cloud -f container/Dockerfile ./container
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Docker 이미지 빌드 실패!${NC}"
-    exit 1
-fi
-echo -e "${GREEN}Docker 이미지 빌드 완료!${NC}"
-
-# 기존의 컨테이너 삭제
-echo -e "${GREEN}기존의 Docker 컨테이너를 삭제 중입니다...${NC}"
-sudo docker rm -f cockpit-cloud-container
-if [ $? -ne 0 ]; then
-    echo -e "${RED}기존 Docker 컨테이너 삭제 실패!${NC}"
-fi
-echo -e "${GREEN}기존 Docker 컨테이너 삭제 완료!${NC}"
-
 # /container/run.sh 파일에 실행 권한 부여
 echo -e "${GREEN}/container/run.sh 파일에 실행 권한을 부여 중입니다...${NC}"
 sudo chmod +x container/run.sh
@@ -177,9 +151,29 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}/container/run.sh 파일에 실행 권한 부여 완료!${NC}"
 
+##########################################################################################################################################
+##########################################################################################################################################
+# sudo docker-compose down
+# sudo docker system prune -a
+# sudo systemctl restart docker
+# sudo docker-compose down
+# sudo docker-compose up --build -d
+##########################################################################################################################################
+##########################################################################################################################################
+
+echo -e "${GREEN}Docker Cleaning...${NC}"
+sudo docker-compose down
+sudo docker system prune -a
+sudo systemctl restart docker
+if [ $? -ne 0 ]; then
+    echo -e "${RED}docker 서비스 재시작 실패!${NC}"
+    exit 1
+fi
+echo -e "${GREEN}docker 서비스 재시작 완료!${NC}"
+
 # Docker Compose를 사용하여 컨테이너 실행
 echo -e "${GREEN}Docker Compose를 사용하여 컨테이너를 실행 중입니다...${NC}"
-sudo docker-compose up -d
+sudo docker-compose up --build -d
 if [ $? -ne 0 ]; then
     echo -e "${RED}Docker Compose 실행 실패!${NC}"
     exit 1
